@@ -1,21 +1,47 @@
 import './App.css'
-import ContactList from './ContactList.tsx'
-import Chat from './Chat.tsx'
-import { useState } from 'react'
-
-const contacts = [
-  { id: 0, name: 'Taylor', email: 'taylor@mail.com' },
-  { id: 1, name: 'Alice', email: 'alice@mail.com' },
-  { id: 2, name: 'Bob', email: 'bob@mail.com' },
-]
+import { useEffect, useRef, useState } from 'react'
+import useMutationLogger from './useMutationLogger.tsx'
 
 function App() {
-  const [to, setTo] = useState(contacts[0].email)
+  useMutationLogger()
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [top, setTop] = useState(0)
+
+  useEffect(() => {
+    if (!buttonRef.current || !showTooltip) setTop(0)
+    else if (buttonRef.current) {
+      setTop(buttonRef.current.getBoundingClientRect().bottom + 25)
+    }
+  }, [showTooltip])
+
+  const now = performance.now()
+  while (now > performance.now() - 1000) {
+    // Do nothing
+  }
 
   return (
     <>
-      <ContactList contacts={contacts} onSelect={setTo} />
-      <Chat to={to} key={to} />
+      <button
+        type="button"
+        onClick={() => setShowTooltip(!showTooltip)}
+        ref={buttonRef}
+      >
+        Show tooltip
+      </button>
+      {showTooltip && (
+        <div
+          className="tooltip"
+          style={{
+            border: '1px solid grey',
+            padding: '10px',
+            position: 'absolute',
+            top: `${top}px`,
+          }}
+        >
+          <span className="tooltiptext">Tooltip text</span>
+        </div>
+      )}
     </>
   )
 }
