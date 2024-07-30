@@ -1,21 +1,100 @@
 import './App.css'
-import ContactList from './ContactList.tsx'
-import Chat from './Chat.tsx'
-import { useState } from 'react'
+import './style.css'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { parseLinkHeader } from './parseLinkHeader.ts'
 
-const contacts = [
-  { id: 0, name: 'Taylor', email: 'taylor@mail.com' },
-  { id: 1, name: 'Alice', email: 'alice@mail.com' },
-  { id: 2, name: 'Bob', email: 'bob@mail.com' },
-]
+interface Photo {
+  albumId: number
+  id: number
+  title: string
+  url: string
+  thumbnailUrl: string
+}
+
+const LIMIT = 30
 
 function App() {
-  const [to, setTo] = useState(contacts[0].email)
+  const [photos, setPhotos] = useState([] as Photo[])
+  const [loading, setLoading] = useState(false)
+  const nextPhotoUrlRef = useRef('')
+
+  const fetchPhotos = async (
+    url: string,
+    { overwrite = false }: { overwrite: boolean },
+  ) => {
+    setLoading(true)
+
+    try {
+      await new Promise((res) => setTimeout(res, 2000))
+      const response = await fetch(url)
+      nextPhotoUrlRef.current = parseLinkHeader(
+        response.headers.get('Link'),
+      ).next
+      const data = await response.json()
+
+      if (overwrite) {
+        setPhotos(data)
+        return
+      } else {
+        setPhotos((prevPhotos) => [...prevPhotos, ...data])
+      }
+    } catch (error) {
+      console.log(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const imgRef = useCallback((image: HTMLImageElement | null) => {
+    if (image == null || nextPhotoUrlRef.current == null) return
+    console.log('imgRef', image)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          console.log('isIntersecting')
+          fetchPhotos(nextPhotoUrlRef.current, {
+            overwrite: false,
+          })
+          observer.unobserve(image)
+        }
+      },
+      { root: null },
+    )
+
+    observer.observe(image)
+  }, [])
+
+  useEffect(() => {
+    fetchPhotos(
+      `http://localhost:3000/photos-short-list?_page=1&_limit=${LIMIT}`,
+      {
+        overwrite: true,
+      },
+    )
+  }, [])
 
   return (
     <>
-      <ContactList contacts={contacts} onSelect={setTo} />
-      <Chat to={to} key={to} />
+      <div className="grid">
+        {photos.map((photo, index) => {
+          return (
+            <img
+              src={photo.url}
+              alt={photo.title}
+              key={photo.id}
+              ref={index === photos.length - 1 ? imgRef : undefined}
+            />
+          )
+        })}
+        {loading &&
+          Array.from({ length: LIMIT }, (_, index) => index).map((n) => {
+            return (
+              <div key={n} className="skeleton">
+                Loading...
+              </div>
+            )
+          })}
+      </div>
     </>
   )
 }
